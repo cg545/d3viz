@@ -1,0 +1,107 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Transistor Visualization</title>
+  <link rel="stylesheet" href="./extras/style.css">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+
+<style>
+  .gridlines line {
+    stroke: #bbb;
+  }
+
+  .gridlines .domain {
+    stroke: none;
+  }
+</style>
+
+<body>
+  <h2>Transistor Visualization</h2>
+  <br>
+  <hr>
+  <br>
+  <h2>Problem 3</h2>
+  <script>
+    d3.json("./extras/chip_dataset.json")
+      .then((data) => { console.log('data', data); }, (error) => { console.log('error', error); })
+  </script>
+  <svg class="transsvg" width="500" height="500">
+  </svg>
+  <script>
+    const svg = d3.select('svg.transsvg');
+    const width = svg.attr('width');
+    const height = svg.attr('height');
+    const margins = { top: 10, right: 10, bottom: 50, left: 50 };
+    let chartWidth = width - margins.left - margins.right;
+    let chartHeight = height - margins.top - margins.bottom;
+    let chartArea = svg.append('g')
+      .attr('transform', `translate(${margins.left},${margins.top})`);
+    d3.json("./extras/chip_dataset.json")
+      .then((data) => {
+        console.log(data)
+        data.forEach((d, i) => {
+          d['releaseDay'] = Number(d['Release Day']);
+          d['transistors'] = Number(d["Transistors(million)"]);
+        });
+        data.filter((d) => { return d['releaseDay'] != 0 && d['transistors'] != 0; });
+        console.log(data);
+        //create some scales
+        const rdExtent = d3.extent(data, d => d['releaseDay']);
+        const xScale = d3.scaleLinear().domain(rdExtent).range([0, chartWidth]);
+        const tExtent = d3.extent(data, d => d['transistors']);
+        const yScale = d3.scaleLog().domain(tExtent).range([chartHeight, 0]);
+
+        let leftAxis = d3.axisLeft(yScale);
+        svg.append('g')
+          .attr('class', 'y axis')
+          .attr('transform', `translate(${margins.left - 10},${margins.top})`)
+          .call(leftAxis);
+
+        let leftGridlines = d3.axisLeft(yScale)
+          .tickSize(-chartWidth - 10)
+          .tickFormat('');
+        svg.append('g')
+          .attr('class', 'y gridlines')
+          .attr('transform', `translate(${margins.left - 10},${margins.top})`)
+          .lower()
+          .call(leftGridlines);
+
+        let bottomAxis = d3.axisBottom(xScale).ticks(6);
+        let element = svg.append('g')
+          .attr('class', 'y axis')
+          .attr('transform', `translate(${margins.left},${chartHeight + margins.top + 10})`)
+          .call(bottomAxis);
+
+        let bottomGridlines = d3.axisBottom(xScale)
+          .tickSize(-chartHeight - 10)
+          .tickFormat('')
+          .ticks(6);
+        svg.append('g')
+          .attr('class', 'x gridlines')
+          .attr('transform', `translate(${margins.left},${chartHeight + margins.top + 10})`)
+          .lower()
+          .call(bottomGridlines);
+
+        data.forEach((d, i) => {
+
+          chartArea.append('circle')
+            .attr('cx', xScale(d['releaseDay']))
+            .attr('cy', yScale(d['transistors']))
+            .attr('r', "3px")
+            .attr('opacity', 0.3)
+            .attr('index', i)
+            .style('fill', 'blue');
+
+        });
+
+      }, (error) => { console.log('error', error); })
+
+  </script>
+
+</body>
+
+</html>

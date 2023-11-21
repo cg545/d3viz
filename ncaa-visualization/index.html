@@ -1,0 +1,47 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>NCAA Visualization</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+
+
+<body>
+  <h2>NCAA Shot Visualization</h2>
+  <p>
+    <style>
+      .ncaaviz {
+        background-color: black;
+      }
+    </style>
+    <svg class="ncaaviz" width="500" height="500">
+    </svg>
+    <script>
+      d3.csv("./things/NCAA_shots.csv")
+        .then((data) => {
+          const svg = d3.select('svg.ncaaviz');
+          let chartArea = svg.append('g')
+          console.log(data)
+          const attemptExtent = d3.extent(data, d => d['log_attempt']);
+          console.log(attemptExtent);
+          let colorScale = d3.scaleSequential(d3.interpolateViridis)
+            .domain(attemptExtent);
+          data.forEach((d) => {
+            chartArea.append('rect')
+              .attr('x', (5 * d['x']))
+              .attr('y', (5 * d['y']))
+              .attr('width', "5px")
+              .attr('height', "5px")
+              .style('fill', colorScale(d['log_attempt']));
+          });
+        }, (error) => { console.log('error', error); })
+    </script>
+  </p>
+  </script>
+  </p>
+</body>
+
+</html>

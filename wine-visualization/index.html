@@ -1,0 +1,162 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Wine Visualization</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+
+<style>
+  .gridlines line {
+    stroke: #bbb;
+  }
+
+  .gridlines .domain {
+    stroke: none;
+  }
+</style>
+
+<body>
+  <h2>Wine Visualization</h2>
+  <p>
+    <svg class="winesvg" width="800" height="500"></svg>
+    <script>
+      const svg = d3.select('svg.winesvg');
+      const width = svg.attr('width');
+      const height = svg.attr('height');
+      const margins = { top: 10, right: 10, bottom: 50, left: 50 };
+      const chartWidth = width - margins.left - margins.right;
+      const chartHeight = height - margins.top - margins.bottom;
+
+      let chartArea = svg.append('g')
+        .attr('transform', `translate(${margins.left},${margins.top})`);
+
+      d3.json("./things/wines.json")
+        .then((data) => {
+
+          data.forEach(d => { //909 initial data points
+            d['points'] = parseInt(d["points"]); //convert points to int
+          });
+          data.forEach(d => {
+            d['price'] = (d["price"]).replace(/[$,]+/g, ""); //format price string
+            d['price'] = parseFloat(d["price"]); //price string to float
+          });
+          console.log("After converting to strings/floats:");
+          console.log(data);
+          data = data.filter((d) => {
+            return d['country'] != "" && d['points'] != 0 &&
+              d['price'] != 0 && d['region_1'] != "" &&
+              d['state'] != "" && d['taster_name'] != "" &&
+              d['title'] != "" && d['variety'] != "" &&
+              d['winery'] != "";
+          }); //data now down to 793 points after removing "" and 0 values
+          //outlier details from inspect element...
+          console.log("After removing 0 and '' values:");
+          console.log(data);
+          data = data.filter((d) => {
+            return d['region_1'] != "N/A" && d['region_1'] != "NONE" &&
+              d['state'] != "Oregano" && d['region_1'] != "NA" && d['state'] != "Mars" &&
+              d['variety'] != "vinegar" &&
+              d['variety'] != "Chardonnnnnay" && d['variety'] != "Joke Here";
+          });
+          console.log("After filtering errors found in outlier points:");
+          console.log(data);
+          const stateSet = new Set([]);
+          data.forEach(d => {
+            stateSet.add(d['state']);
+          });
+          console.log(stateSet);
+          function stateColor(state) {
+            if (state == "New York") {
+              return "red"
+            } else if (state == "Washington") {
+              return "green"
+            } else if (state == "California") {
+              return "blue"
+            } else if (state == "Oregon") {
+              return "yellow"
+            }
+          }
+          //price on x, points on y, color by state
+          //scales
+          const priceExtent = d3.extent(data, d => d['price']);
+          const priceScale = d3.scaleLinear().domain(priceExtent).range([0, chartWidth]);
+
+          const pointExtent = d3.extent(data, d => d['points']);
+          const pointScale = d3.scaleLinear().domain(pointExtent).range([chartHeight, 0]);
+
+          //adding the axis
+          //point axis
+          let leftAxis = d3.axisLeft(pointScale); //it is at this point I realized the points were off!
+          svg.append('g')
+            .attr('class', 'y axis')
+            .attr('transform', `translate(${margins.left - 10},${margins.top})`)
+            .call(leftAxis);
+          //price axis
+          let bottomAxis = d3.axisBottom(priceScale).ticks(6);
+          let element = svg.append('g')
+            .attr('class', 'y axis')
+            .attr('transform', `translate(${margins.left},${chartHeight + margins.top + 10})`)
+          bottomAxis(element);
+          //gridlines
+          let leftGridlines = d3.axisLeft(pointScale)
+            .tickSize(-chartWidth - 10)
+            .tickFormat('');
+          svg.append('g')
+            .attr('class', 'y gridlines')
+            .attr('transform', `translate(${margins.left - 10},${margins.top})`)
+            .lower()
+            .call(leftGridlines);
+
+          let bottomGridlines = d3.axisBottom(priceScale)
+            .tickSize(-chartHeight - 10)
+            .tickFormat('')
+            .ticks(4);
+          svg.append('g')
+            .attr('class', 'x gridlines')
+            .attr('transform', `translate(${margins.left},${chartHeight + margins.top + 10})`)
+            .lower()
+            .call(bottomGridlines);
+
+          function jitter() {
+            return Math.floor(Math.random() * (9)) + -4;
+          }
+
+          let jChartArea = svg.append('g') //g area for jitter plot
+            .attr('transform', `translate(${margins.left},${margins.top})`);
+
+          let infoArea = svg.append('g') //g area for jitter plot
+            .attr('transform', `translate(${margins.left},${margins.top})`);
+
+          //adding the jitter circles 
+          data.forEach((d, i) => {
+            jChartArea.append('circle')
+              .attr('cx', priceScale(d['price']) + jitter())
+              .attr('cy', pointScale(d['points']) + jitter())
+              .attr('r', "3px")
+              .attr('opacity', 0.5)
+              .style('fill', stateColor(d['state']))
+              .on("mouseover", function (event, data) {
+                d3.select(this)
+                  .attr('r', "6px");
+                infoArea.append("text")
+                  .attr('x', 15)
+                  .attr('y', 5)
+                  .text("Wine Title: " + d['title'])
+                  .attr('fill', 'red');
+              })
+              .on("mouseout", function (event, d) {
+                d3.select(this)
+                  .attr('r', "3px");
+                infoArea.selectAll("*").remove();
+              });
+          });
+
+        }, (error) => { console.log('error', error); })
+    </script>
+  </p>
+</body>
+
+</html>

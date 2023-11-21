@@ -1,0 +1,85 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>NY Income Visualization</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://d3js.org/topojson.v3.min.js"></script>
+</head>
+
+<body>
+  <p>
+    <svg id="choropleth" height="770" width="990" style="margin:20px"></svg>
+  <ul id="quantileThresholds"></ul>
+  <script>
+    const svg = d3.select("#choropleth");
+    const width = svg.attr("width");
+    const height = svg.attr("height");
+    const margin = { top: 20, right: 20, bottom: 20, left: 20 };
+    const mapWidth = width - margin.left - margin.right;
+    const mapHeight = height - margin.top - margin.bottom;
+    const map = svg.append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    const requestData = async function () {
+      const nyincome = await d3.json("/things/ny.topo.json");
+      console.log(nyincome);
+      var zips = topojson.feature(nyincome, nyincome.objects.zip_codes);
+      var zipsMesh = topojson.mesh(nyincome, nyincome.objects.zip_codes);
+      var stateMesh = topojson.mesh(nyincome, nyincome.objects.state);
+      var projection = d3.geoMercator().fitSize([mapWidth, mapHeight], stateMesh);
+      var path = d3.geoPath().projection(projection);
+      //darkest to lightest
+      //quintileColors = ["#003b49", "darkblue", "#007a78", "#00bfb2", "cyan"];
+      quintileColors = ["cyan", "#00bfb2", "007a78", "darkblue", "#003b49"]
+      //console.log(nyincome.objects.zip_codes.geometries);
+      incomeArray = [];
+      (nyincome.objects.zip_codes.geometries).map(zip => incomeArray.push(zip.properties.median_income));
+      infoArray = [];
+      (nyincome.objects.zip_codes.geometries).map(zip => infoArray.push({ zip_code: zip.properties.ZIP, median_income: zip.properties.median_income }));
+
+      const colorScale = d3.scaleQuantile()
+        .domain(d3.map(infoArray, d => d.median_income))
+        .range(quintileColors);
+
+      let zipPaths = map.selectAll("path.zip").data(zips.features)
+        .join("path")
+        .attr("class", "zip")
+        .attr("d", path)
+        .attr("fill", d => colorScale(d.properties.median_income))
+
+      map.append("path").datum(zipsMesh)
+        .attr("d", path)
+        .attr("stroke", "white")
+        .attr("stroke-width", 1)
+        .attr("fill", "none");
+
+      map.append("path").datum(stateMesh)
+        .attr("d", path)
+        .attr("stroke", "darkgrey")
+        .attr("stroke-width", 1)
+        .attr("fill", "none");
+
+      const theProjection = projection([-76.4850, 42.4476])
+      map.append("circle")
+        .attr("r", 5)
+        .attr("cx", theProjection[0])
+        .attr("cy", theProjection[1])
+        .attr("fill", "black");
+
+      d3.select("#quantileThresholds")
+        .selectAll("li").data(quintileColors)
+        .join("li")
+        .append("span")
+        .style("background-color", (d) => d)
+        .text((d) => "Minimum Median Household Income: " + Math.trunc((colorScale.invertExtent(d)[0])))
+        .style("color", "white");
+      //console.log(d3.extent(incomeArray));
+    }
+
+    requestData();
+  </script>
+  </p>
+</body>

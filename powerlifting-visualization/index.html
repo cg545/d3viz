@@ -1,0 +1,277 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Powerlifting Visualization</title>
+  <link rel="stylesheet" href="/css/bootstrap.min.css">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+
+<style>
+  .gridlines line {
+    stroke: #bbb;
+  }
+
+  .gridlines .domain {
+    stroke: none;
+  }
+
+  .headerPara {
+    width: 70%;
+  }
+
+  .lightgrey {
+    color: lightgrey;
+  }
+
+  .grey {
+    color: grey;
+  }
+
+  .darkgrey {
+    color: darkgrey;
+  }
+
+  .black {
+    color: black;
+  }
+
+  body {
+    background: whitesmoke;
+  }
+</style>
+
+<body>
+  <center>
+    <h1>Powerlifting Visualization</h1>
+    <hr>
+    <h4>Description</h4>
+    <p class="headerPara">
+      On the left axis is the average deadlift, on the bottom axis is the age. There are two circles, one for male (dark
+      grey) and
+      one for female (light grey) powerlifters at the given age. If you hover on the circles, you can see the average
+      lifts by gender
+      and diffference.
+    </p>
+    <br />
+    <br />
+    <h4>Average Deadlift by Age by Gender</h4>
+    <svg class="graph" width="750" height="250"></svg>
+    <div class="row">
+      <div class="col">
+        <span class="grey">&#9679;</span> : Male Lifters
+        <br>
+        <span class="lightgrey">&#9679;</span> : Female Lifters
+      </div>
+      <div class="col">
+        <span class="lightgrey">&#x258f;</span> : < 35% difference compared to male lift <br>
+          <span class="grey">&#x258f;</span> : >= 35% difference to < 40% difference compared to male lift <br>
+            <span class="black">&#x258f;</span> : >= 40% difference compared to male lift
+      </div>
+    </div>
+  </center>
+  <script>
+    const svg = d3.select('svg.graph');
+    const width = svg.attr('width');
+    const height = svg.attr('height');
+    const margins = { top: 20, right: 20, bottom: 50, left: 50 };
+    const chartWidth = width - margins.left - margins.right;
+    const chartHeight = height - margins.top - margins.bottom;
+
+    d3.csv("./data/powerlifting.csv")
+      .then((data) => {
+        //building the data I want
+        console.log(data);
+        data.forEach(d => {
+          d['age'] = parseInt(d["age"]) //into an int
+          d['best3deadlift_kg'] = parseFloat(d["best3deadlift_kg"]); //into a float
+        });
+        var cleanData = data.filter(d => {
+          return d['sex'] == "M" && d['best3deadlift_kg'] != "NA"
+            && d['age'] != "NA" && d['best3deadlift_kg'] > 0
+            && d['age'] > 10 && d['age'] <= 75;
+        });
+        var cleanFData = data.filter(d => {
+          return d['sex'] == "F" && d['best3deadlift_kg'] != "NA"
+            && d['age'] != "NA" && d['best3deadlift_kg'] > 0
+            && d['age'] > 10 && d['age'] <= 75;
+        });
+        var dict = {};
+        cleanData.forEach(d => { //generates key:list
+          if (dict[d["age"]]) {
+            dict[d["age"]].push(d["best3deadlift_kg"])
+          } else {
+            dict[d["age"]] = [d["best3deadlift_kg"]]
+          }
+        });
+        var dataset = []
+        for (var key in dict) {
+          if (dict.hasOwnProperty(key)) {
+            dataset.push({ "age": key, "average": (dict[key].reduce((partialSum, a) => partialSum + a, 0) / dict[key].length) })
+          }
+        }
+        var fdict = {};
+        cleanFData.forEach(d => { //generates key:list
+          if (fdict[d["age"]]) {
+            fdict[d["age"]].push(d["best3deadlift_kg"])
+          } else {
+            fdict[d["age"]] = [d["best3deadlift_kg"]]
+          }
+        });
+        var fdataset = []
+        for (var key in fdict) {
+          if (fdict.hasOwnProperty(key)) {
+            fdataset.push({ "age": key, "average": (fdict[key].reduce((partialSum, a) => partialSum + a, 0) / fdict[key].length) })
+          }
+        }
+        //combining to one dataset
+        cdataset = [];
+        for (let i = 0; i < dataset.length; i++) {
+          cdataset.push({ "age": dataset[i].age, "maleAverage": dataset[i].average, "femaleAverage": fdataset[i].average, "difference": (dataset[i].average - fdataset[i].average) })
+        }
+        console.log(cdataset);
+
+
+        //scales
+        //x
+        const ageExtent = d3.extent(cleanData, d => d['age']);
+        const ageScale = d3.scaleLinear().domain(ageExtent).range([0, chartWidth]);
+        //y
+
+        const dlExtent = d3.extent(cleanData, d => d['best3deadlift_kg'] * 2.2);
+        const dlScale = d3.scaleLinear().domain(dlExtent).range([chartHeight, 0]);
+
+        //lbs axis
+        let leftAxis = d3.axisLeft(dlScale); //it is at this point I realized the points were off!
+        svg.append('g')
+          .attr('class', 'y axis')
+          .attr('transform', `translate(${margins.left - 10},${margins.top})`)
+          .call(leftAxis);
+        //age axis
+        let bottomAxis = d3.axisBottom(ageScale).ticks(6);
+        let element = svg.append('g')
+          .attr('class', 'y axis')
+          .attr('transform', `translate(${margins.left},${chartHeight + margins.top + 10})`)
+        bottomAxis(element);
+        //gridlines
+        let leftGridlines = d3.axisLeft(dlScale)
+          .tickSize(-chartWidth - 10)
+          .tickFormat('');
+        svg.append('g')
+          .attr('class', 'y gridlines')
+          .attr('transform', `translate(${margins.left - 10},${margins.top})`)
+          .lower()
+          .call(leftGridlines);
+
+        let bottomGridlines = d3.axisBottom(ageScale)
+          .tickSize(-chartHeight - 10)
+          .tickFormat('')
+          .ticks(4);
+        svg.append('g')
+          .attr('class', 'x gridlines')
+          .attr('transform', `translate(${margins.left},${chartHeight + margins.top + 10})`)
+          .lower()
+          .call(bottomGridlines);
+
+        let chartArea = svg.append('g')
+          .attr('transform', `translate(${margins.left},${margins.top})`);
+
+        cdataset.forEach((d) => {
+
+          if ((d.difference / d.maleAverage) < .35) {
+            chartArea.append("line")
+              .attr("x1", parseInt(ageScale((d.age))))
+              .attr("y1", parseInt(dlScale(d.maleAverage * 2.2)))
+              .attr("x2", parseInt(ageScale((d.age))))
+              .attr("y2", parseInt(dlScale(d.femaleAverage * 2.2)))
+              .attr("stroke", "lightgrey")
+              .attr("stroke-width", 2);
+          } else if ((d.difference / d.maleAverage) >= .35 && (d.difference / d.maleAverage) < .40) {
+            chartArea.append("line")
+              .attr("x1", parseInt(ageScale((d.age))))
+              .attr("y1", parseInt(dlScale(d.maleAverage * 2.2)))
+              .attr("x2", parseInt(ageScale((d.age))))
+              .attr("y2", parseInt(dlScale(d.femaleAverage * 2.2)))
+              .attr("stroke", "grey")
+              .attr("stroke-width", 2);
+          } else if ((d.difference / d.maleAverage) >= .40) {
+            chartArea.append("line")
+              .attr("x1", parseInt(ageScale((d.age))))
+              .attr("y1", parseInt(dlScale(d.maleAverage * 2.2)))
+              .attr("x2", parseInt(ageScale((d.age))))
+              .attr("y2", parseInt(dlScale(d.femaleAverage * 2.2)))
+              .attr("stroke", "black")
+              .attr("stroke-width", 2);
+          }
+
+          chartArea.append("circle")
+            .attr("cx", parseInt(ageScale((d.age))))
+            .attr("cy", parseInt(dlScale(d.maleAverage * 2.2)))
+            .attr("r", 4)
+            .attr("fill", "grey")
+            .attr("stroke", "black")
+            .attr("stroke-width", 1)
+            .on("mouseover", function (event, data) {
+              d3.select(this)
+                .attr('r', 5);
+              chartArea.append('text')
+                .attr("class", "labelmen")
+                .attr("x", 350)
+                .attr("y", 0)
+                .text("Male Average: " + parseInt(d.maleAverage * 2.2) + " lbs; " + "Female Average: " + parseInt(d.femaleAverage * 2.2) + " lbs; Difference: " + parseInt(d.difference * 2.2) + "lbs")
+                .style("font-weight", "bold")
+                .style("font-size", "10px");
+            })
+            .on("mouseout", function (event, d) {
+              d3.select(this)
+                .attr('r', 4);
+              d3.selectAll(".labelmen").remove();
+              d3.selectAll(".labelwomen").remove();
+            });
+          chartArea.append("circle")
+            .attr("cx", parseInt(ageScale((d.age))))
+            .attr("cy", parseInt(dlScale(d.femaleAverage * 2.2)))
+            .attr("r", 4)
+            .attr("fill", "lightgrey")
+            .attr("stroke", "black")
+            .attr("stroke-width", 1)
+            .on("mouseover", function (event, data) {
+              d3.select(this)
+                .attr('r', 5);
+              chartArea.append('text')
+                .attr("class", "labelmen")
+                .attr("x", 350)
+                .attr("y", 0)
+                .text("Female Average: " + parseInt(d.femaleAverage * 2.2) + " lbs; Male Average: " + parseInt(d.maleAverage * 2.2) + " lbs; Difference: " + parseInt(d.difference * 2.2) + "lbs")
+                .style("font-weight", "bold")
+                .style("font-size", "10px");
+            })
+            .on("mouseout", function (event, d) {
+              d3.select(this)
+                .attr('r', 4);
+              d3.selectAll(".labelmen").remove();
+              d3.selectAll(".labelwomen").remove();
+            });
+
+        });
+
+      });
+  </script>
+  <hr>
+  <center>
+    <h4>Conclusions</h4>
+    <p class="headerPara">
+      From this visualization, it can be seen that the largest difference between male and female performance occurs
+      between the
+      ages of 30 and 40 and after the age of 70. Young lifters are the most likely to
+      have
+      closer lifts. Another conclusion that can be drawn from this visualization is that peak strength for both males
+      and
+      females, on average, occurs roughly around age 30-35.
+    </p>
+  </center>
+</body>
+
+</html>
